@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Agent Control Tower</title>
+  <meta name="description" content="Operator cockpit for a fleet of AI agents: live status, approvals, kill switch, cost, replay and audit.">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <a class="skip" href="#fleet">Skip to the fleet</a>
+
+  <header class="top">
+    <div class="brand">
+      <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path d="M12 2 9 8h6l-3-6Zm-1 7v9H8l-2 4h12l-2-4h-3V9h-2Z" fill="currentColor"/></svg>
+      <div>
+        <h1>Agent Control Tower</h1>
+        <p class="tenant" id="tenant">Connecting…</p>
+      </div>
+    </div>
+    <div class="top-actions">
+      <span class="conn" id="conn" role="status" aria-live="polite"><i></i><span>Connecting</span></span>
+      <label class="op">
+        <span>Operator</span>
+        <input id="operator" type="text" maxlength="40" autocomplete="off" spellcheck="false" placeholder="Your name">
+      </label>
+      <label class="switch" title="When on, the Tower kills or pauses an agent on its own when it detects repeated policy violations, loops or drift.">
+        <input id="autoContain" type="checkbox" role="switch">
+        <span>Auto-containment</span>
+      </label>
+      <button class="btn" id="share" type="button" title="Copy a link to this room so others can watch and intervene with you">Copy room link</button>
+      <button class="btn" id="theme" type="button" aria-label="Toggle light or dark theme">Theme</button>
+      <button class="btn danger" id="haltAll" type="button">Halt fleet</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="guide" id="guide" aria-labelledby="guideTitle">
+      <div class="guide-head">
+        <h2 id="guideTitle">Try an intervention <span class="muted" id="guideProgress"></span></h2>
+        <button class="btn small" id="guideToggle" type="button" aria-expanded="true">Hide</button>
+      </div>
+      <ol class="guide-steps" id="guideSteps"></ol>
+    </section>
+
+    <section class="kpis" id="kpis" aria-label="Fleet summary"></section>
+
+    <div class="layout">
+      <section id="fleet" aria-labelledby="fleetTitle">
+        <div class="section-head">
+          <h2 id="fleetTitle">Fleet</h2>
+          <div class="chips" id="teamFilters" role="group" aria-label="Filter by team"></div>
+        </div>
+        <p class="empty" id="fleetEmpty" hidden>No agents belong to this team. Approvals routed to it still appear in the queue.</p>
+        <div class="agents" id="agents"></div>
+      </section>
+
+      <aside aria-label="Operator queue">
+        <section class="panel" aria-labelledby="apTitle">
+          <div class="section-head">
+            <h2 id="apTitle">Approval queue <span class="count" id="apCount">0</span></h2>
+          </div>
+          <p class="empty" id="apEmpty">Nothing waiting. Agents stop here when a call crosses a guardrail.</p>
+          <div class="ap-list" id="approvals"></div>
+          <details class="recent">
+            <summary>Recent decisions</summary>
+            <ul class="recent-list" id="apRecent"></ul>
+          </details>
+        </section>
+
+        <section class="panel" aria-labelledby="incTitle">
+          <div class="section-head"><h2 id="incTitle">Incidents</h2></div>
+          <p class="empty" id="incEmpty">No incidents. If the Tower contains an agent, it appears here.</p>
+          <div id="incidents"></div>
+        </section>
+      </aside>
+    </div>
+
+    <section class="tabs" aria-label="Details">
+      <div class="tablist" role="tablist" id="tablist">
+        <button role="tab" id="tab-feed" aria-controls="panel-feed" aria-selected="true" type="button">Live feed</button>
+        <button role="tab" id="tab-cost" aria-controls="panel-cost" aria-selected="false" tabindex="-1" type="button">Cost &amp; tokens</button>
+        <button role="tab" id="tab-systems" aria-controls="panel-systems" aria-selected="false" tabindex="-1" type="button">Blast radius</button>
+        <button role="tab" id="tab-audit" aria-controls="panel-audit" aria-selected="false" tabindex="-1" type="button">Audit log</button>
+        <button role="tab" id="tab-policy" aria-controls="panel-policy" aria-selected="false" tabindex="-1" type="button">Guardrails</button>
+        <button role="tab" id="tab-lab" aria-controls="panel-lab" aria-selected="false" tabindex="-1" type="button">Simulation lab</button>
+      </div>
+
+      <div role="tabpanel" id="panel-feed" aria-labelledby="tab-feed" class="tabpanel">
+        <div class="toolbar">
+          <label>Show
+            <select id="feedFilter">
+              <option value="all">Everything</option>
+              <option value="decisions">Decisions &amp; actions</option>
+              <option value="control">Interventions &amp; incidents</option>
+              <option value="thoughts">Reasoning only</option>
+            </select>
+          </label>
+          <span class="muted" id="feedCount"></span>
+        </div>
+        <ol class="feed" id="feed" aria-label="Live event stream"></ol>
+      </div>
+
+      <div role="tabpanel" id="panel-cost" aria-labelledby="tab-cost" class="tabpanel" hidden>
+        <div class="table-wrap"><table id="costAgents"></table></div>
+        <h3>Per task (most recent first)</h3>
+        <div class="table-wrap"><table id="costTasks"></table></div>
+        <p class="muted small">Rates are illustrative per-million-token prices (see src/pricing.js). Every model call is metered by the Tower, which doubles as the LLM proxy.</p>
+      </div>
+
+      <div role="tabpanel" id="panel-systems" aria-labelledby="tab-systems" class="tabpanel" hidden>
+        <p class="muted">What agents have actually changed in the (simulated) systems. Protected assets should never move. If they do, containment failed.</p>
+        <div class="tiles" id="worldTiles"></div>
+      </div>
+
+      <div role="tabpanel" id="panel-audit" aria-labelledby="tab-audit" class="tabpanel" hidden>
+        <div class="toolbar">
+          <label>Agent <select id="auditAgent"><option value="">All</option></select></label>
+          <label>Actor <select id="auditActor"><option value="">All</option><option value="agent">Agents</option><option value="operator">Operators</option><option value="tower">Tower</option></select></label>
+          <a class="btn" id="exportCsv" href="#" download>Export CSV</a>
+          <a class="btn" id="exportJson" href="#" download>Export JSON</a>
+          <button class="btn" id="verify" type="button">Verify hash chain</button>
+          <span id="verifyResult" class="verify" role="status" aria-live="polite"></span>
+        </div>
+        <div class="table-wrap tall"><table id="auditTable"></table></div>
+        <p class="muted small">Every decision, approval and intervention is appended to a SHA-256 hash chain. Editing or deleting any row breaks every hash after it.</p>
+      </div>
+
+      <div role="tabpanel" id="panel-policy" aria-labelledby="tab-policy" class="tabpanel" hidden>
+        <div class="table-wrap"><table id="policyTable"></table></div>
+        <div id="policyNotes"></div>
+      </div>
+
+      <div role="tabpanel" id="panel-lab" aria-labelledby="tab-lab" class="tabpanel" hidden>
+        <p class="muted">Not an operator control: this makes the simulated agents misbehave so you can watch the Tower respond. Try the rogue one on the Data Janitor.</p>
+        <div id="labAgents" class="lab"></div>
+        <div class="toolbar"><button class="btn" id="reset" type="button">Reset simulation</button><span class="muted small">Restores agents and systems. The audit log is kept.</span></div>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="replay" aria-labelledby="replayTitle"></dialog>
+  <div class="toasts" id="toasts" role="status" aria-live="polite"></div>
+
+  <script type="module" src="/js/main.js"></script>
+</body>
+</html>

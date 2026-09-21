@@ -1,0 +1,17 @@
+{
+  "name": "agent-control-tower",
+  "version": "1.0.0",
+  "description": "An operator cockpit for a fleet of AI agents: live event stream, policy gateway, approvals, kill switch, cost metering, replay and a tamper-evident audit log.",
+  "type": "module",
+  "private": true,
+  "license": "MIT",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test \"test/*.test.js\"",
+    "drill": "node scripts/rogue-drill.js",
+    "e2e": "node scripts/e2e.mjs"
+  }
+}

@@ -1,0 +1,16 @@
+# fly launch --copy-config --no-deploy && fly deploy
+app = "agent-control-tower"
+primary_region = "iad"
+
+[build]
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "off"
+  min_machines_running = 1
+  [http_service.checks]
+    [http_service.checks.health]
+      path = "/healthz"
+      interval = "30s"
+      timeout = "3s"

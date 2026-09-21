@@ -1,0 +1,10 @@
+# One-click deploy: Render → New → Blueprint → point at this repo. No env vars required.
+services:
+  - type: web
+    name: agent-control-tower
+    runtime: docker
+    plan: free
+    healthCheckPath: /healthz
+    envVars:
+      - key: MAX_ROOMS
+        value: "40"
